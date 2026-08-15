@@ -3,7 +3,8 @@ const { DEFAULT_SENSOR_DATA, DEFAULT_SETTINGS } = require("../utils/constants");
 let switchState = false;
 let loads = {
   load1: true,
-  load2: true
+  load2: true,
+  supply: true
 };
 let latestSensorData = { ...DEFAULT_SENSOR_DATA };
 let settingsFallback = { ...DEFAULT_SETTINGS };
