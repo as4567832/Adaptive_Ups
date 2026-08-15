@@ -36,7 +36,8 @@ function setLatestSensorData(data) {
     humidity: Number(data.humidity),
     distance: Number(data.distance),
     battery: data.battery === undefined ? latestSensorData.battery : Number(data.battery),
-    inputVoltage: data.inputVoltage === undefined ? latestSensorData.inputVoltage : Number(data.inputVoltage)
+    inputVoltage: data.inputVoltage === undefined ? latestSensorData.inputVoltage : Number(data.inputVoltage),
+    current: data.current === undefined ? (latestSensorData.current || 0) : Number(data.current)
   };
 
   return latestSensorData;

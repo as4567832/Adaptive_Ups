@@ -6,6 +6,7 @@ const SensorSchema = new mongoose.Schema({
   distance: { type: Number, default: 0 },
   battery: { type: Number, default: 0 },
   inputVoltage: { type: Number, default: 0 },
+  current: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now }
 });
 

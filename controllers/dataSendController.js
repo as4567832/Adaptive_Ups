@@ -4,14 +4,14 @@ const { getSwitchState, toggleLoad, getLoads, setLatestSensorData } = require(".
 
 const sendData = async (req, res) => {
     try {
-        const { temperature, humidity, distance, battery, inputVoltage } = req.body;
-        console.log("Received ESP32 data:", { temperature, humidity, distance, battery, inputVoltage });
+        const { temperature, humidity, distance, battery, inputVoltage, current } = req.body;
+        console.log("Received ESP32 data:", { temperature, humidity, distance, battery, inputVoltage, current });
 
         if (temperature === undefined || humidity === undefined || distance === undefined) {
             return res.status(400).json({ error: "Missing required fields" });
         }
 
-        const normalized = setLatestSensorData({ temperature, humidity, distance, battery, inputVoltage });
+        const normalized = setLatestSensorData({ temperature, humidity, distance, battery, inputVoltage, current });
         let savedData = normalized;
 
         if (isDbConnected()) {
