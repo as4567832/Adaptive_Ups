@@ -1,9 +1,9 @@
 const DEFAULT_SENSOR_DATA = {
-  temperature: 0,
-  humidity: 0,
-  distance: 0,
-  battery: 0,
-  inputVoltage: 0
+  temperature: 25,
+  humidity: 50,
+  distance: 100,
+  battery: 100,
+  inputVoltage: 220
 };
 const DEFAULT_SETTINGS = {
   lowBatteryThreshold: 20,
