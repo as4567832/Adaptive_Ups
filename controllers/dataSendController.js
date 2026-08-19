@@ -28,12 +28,16 @@ const sendData = async (req, res) => {
 
         const switchState = getSwitchState();
         const toggleLoadResult = getLoads();
-        console.log("Current switch state:", toggleLoadResult);
+        const responseLoads = {
+            ...toggleLoadResult,
+            source: toggleLoadResult.supply
+        };
+        console.log("Current load/source state:", responseLoads);
 
         return res.status(200).json({
             message: "Data saved",
             data: savedData,
-            toggleLoad: toggleLoadResult,
+            toggleLoad: responseLoads,
         });
 
     } catch (error) {

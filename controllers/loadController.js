@@ -14,7 +14,7 @@ async function toggleLoadById(req, res) {
   let id = req.params.id;
   if (id === "1") id = "load1";
   if (id === "2") id = "load2";
-  if (id === "3" || id === "load3") id = "supply";
+  if (id === "3" || id === "load3" || id === "source") id = "supply";
 
   if (!hasLoadId(id)) {
     return res.status(400).json({ error: "Invalid load ID" });
