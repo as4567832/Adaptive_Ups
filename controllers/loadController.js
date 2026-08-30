@@ -22,11 +22,8 @@ async function toggleLoadById(req, res) {
 
   const state = toggleLoad(id);
 
-  // 🔥 Sabhi loads ka status ek saath
-  const loads = getLoads();
-
+  console.log(`\n⚡ [APP COMMAND RECEIVED] Load/Source Target: '${id}' -> New State: ${state}`);
   console.log("==== Current Loads Status ====");
-
   console.table(getLoads());
 
   return res.json({ id, state });
