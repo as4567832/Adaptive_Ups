@@ -19,16 +19,28 @@ function getSwitchState() {
 }
 
 function getLoads() {
-  return loads;
+  return {
+    ...loads,
+    source: loads.supply
+  };
 }
 
 function hasLoadId(id) {
+  if (id === 'source' || id === '3' || id === 3) return true;
   return Object.prototype.hasOwnProperty.call(loads, id);
 }
 
 function toggleLoad(id) {
-  loads[id] = !loads[id];
-  return loads[id];
+  let target = id;
+  if (id === 'source' || id === '3' || id === 3) target = 'supply';
+  if (id === '1' || id === 1) target = 'load1';
+  if (id === '2' || id === 2) target = 'load2';
+
+  if (Object.prototype.hasOwnProperty.call(loads, target)) {
+    loads[target] = !loads[target];
+    return loads[target];
+  }
+  return false;
 }
 
 function setLatestSensorData(data) {
