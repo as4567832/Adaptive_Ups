@@ -3,8 +3,10 @@ const Relay = require("../models/Relay");
 const { isDbConnected } = require("../config/db");
 const {
   getLoads,
+  setAllLoads,
   setLatestSensorData,
-  updateEspHeartbeat
+  updateEspHeartbeat,
+  getLastAppCommandTimestamp
 } = require("../services/fallbackService");
 
 const sendData = async (req, res) => {
@@ -59,7 +61,18 @@ const sendData = async (req, res) => {
     });
     let savedData = normalized;
 
-    // Sync backend memory & MongoDB state with reported hardware states from ESP32 Serial/Web commands
+    if (isDbConnected()) {
+      try {
+        const newData = new Sensor(normalized);
+        savedData = await newData.save();
+      } catch (dbErr) {
+        console.error("MongoDB Save Error (Data kept in memory fallback):", dbErr.message);
+      }
+    }
+
+    // Check if an app command was recently sent (within 10 seconds)
+    const appCommandRecent = (Date.now() - getLastAppCommandTimestamp()) < 10000;
+
     const hwStates = {};
     if (typeof load1 === "boolean") hwStates.load1 = load1;
     if (typeof load2 === "boolean") hwStates.load2 = load2;
@@ -71,21 +84,26 @@ const sendData = async (req, res) => {
     if (typeof req.body.battSupply === "boolean") hwStates.battSupply = req.body.battSupply;
     if (typeof req.body.charger === "boolean") hwStates.charger = req.body.charger;
 
-    if (isDbConnected()) {
-      try {
-        const newData = new Sensor(normalized);
-        savedData = await newData.save();
-        await Relay.findOneAndUpdate(
-          {},
-          { ...hwStates, lastEspSeen: new Date() },
-          { upsert: true }
-        );
-      } catch (dbErr) {
-        console.error("MongoDB Save Error (Data kept in memory fallback):", dbErr.message);
+    let currentLoads;
+    if (appCommandRecent) {
+      // User clicked a control button on the website/app recently. Preserve target loads so ESP32 executes it!
+      currentLoads = getLoads();
+    } else {
+      // No recent app command; sync reported hardware state from ESP32 Serial Monitor / local actions
+      currentLoads = setAllLoads(hwStates);
+      if (isDbConnected()) {
+        try {
+          await Relay.findOneAndUpdate(
+            {},
+            { ...hwStates, lastEspSeen: new Date() },
+            { upsert: true }
+          );
+        } catch (dbErr) {
+          console.error("MongoDB Relay Save Error:", dbErr.message);
+        }
       }
     }
 
-    const currentLoads = setAllLoads(hwStates);
     const responseLoads = {
       load1: currentLoads.load1,
       load2: currentLoads.load2,

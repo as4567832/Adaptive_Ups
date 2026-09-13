@@ -22,6 +22,16 @@ function getSwitchState() {
   return switchState;
 }
 
+let lastAppCommandTimestamp = 0;
+
+function touchAppCommand() {
+  lastAppCommandTimestamp = Date.now();
+}
+
+function getLastAppCommandTimestamp() {
+  return lastAppCommandTimestamp;
+}
+
 function isEspOnline() {
   if (!lastEspSeen) return false;
   // Consider ESP online if seen within the last 15 seconds (ESP reports every 3s)
@@ -138,5 +148,7 @@ module.exports = {
   setLatestSensorData,
   getLatestSensorData,
   getSettingsFallback,
-  updateSettingsFallback
+  updateSettingsFallback,
+  touchAppCommand,
+  getLastAppCommandTimestamp
 };

@@ -8,7 +8,8 @@ const {
   setLoad,
   setAllLoads,
   getSwitchState,
-  toggleSwitchState
+  toggleSwitchState,
+  touchAppCommand
 } = require("../services/fallbackService");
 
 async function getAllLoads(req, res) {
@@ -48,6 +49,7 @@ async function toggleLoadById(req, res) {
     explicitState = req.query.state === "true";
   }
 
+  touchAppCommand();
   const state = setLoad(target, explicitState);
 
   // Persist to MongoDB if connected
@@ -99,6 +101,7 @@ async function batchSetLoads(req, res) {
   if (typeof battSupply === "boolean") newStates.battSupply = battSupply;
   if (typeof charger === "boolean") newStates.charger = charger;
 
+  touchAppCommand();
   const updatedLoads = setAllLoads(newStates);
 
   if (isDbConnected()) {
