@@ -18,11 +18,11 @@ async function getAllLoads(req, res) {
       const doc = await Relay.findOne().lean();
       if (doc) {
         setAllLoads({
-          load1: doc.load1,
-          load2: doc.load2,
-          supply: doc.supply ?? doc.source,
-          battSupply: doc.battSupply,
-          charger: doc.charger
+          load1: doc.load1 ?? true,
+          load2: doc.load2 ?? true,
+          supply: (doc.supply ?? doc.source) ?? true,
+          battSupply: doc.battSupply ?? true,
+          charger: doc.charger ?? true
         });
       }
     } catch (err) {
@@ -36,7 +36,7 @@ async function toggleLoadById(req, res) {
   let id = req.params.id;
 
   if (!hasLoadId(id)) {
-    return res.status(400).json({ error: "Invalid load ID. Expected 1, 2, 3, load1, load2, or source/supply." });
+    return res.status(400).json({ error: "Invalid load ID. Expected 1, 2, 3, 4, 5, load1, load2, source/supply, battSupply, or charger." });
   }
 
   const target = normalizeLoadId(id);
