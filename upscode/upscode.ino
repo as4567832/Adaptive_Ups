@@ -176,7 +176,7 @@ const char* otaWebPage =
 int lastZmptP2p = 0;
 int lastAcsP2p = 0;
 unsigned long lastPostTime = 0;
-const unsigned long postInterval = 3000; // Send & log every 3 seconds
+const unsigned long postInterval = 500; // High-speed instant cloud sync (500ms)
 
 // True RMS Calibration multiplier (converts True RMS ADC counts to AC Mains Volts)
 float zmpt_sensitivity = 0.27;
@@ -825,7 +825,7 @@ void loop() {
       client.setInsecure(); // skip certificate validation
 
       HTTPClient http;
-      http.setTimeout(6000); // 6 second timeout for stable cloud sync
+      http.setTimeout(1500); // 1.5s fast timeout for instant sync
       http.begin(client, serverName);
       sensors.requestTemperatures(); 
       http.addHeader("Content-Type", "application/json");
