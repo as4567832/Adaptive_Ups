@@ -6,6 +6,8 @@ let loads = {
   load2: true,
   supply: true
 };
+
+let lastEspSeen = null;
 let latestSensorData = { ...DEFAULT_SENSOR_DATA };
 let settingsFallback = { ...DEFAULT_SETTINGS };
 
@@ -18,29 +20,68 @@ function getSwitchState() {
   return switchState;
 }
 
+function isEspOnline() {
+  if (!lastEspSeen) return false;
+  // Consider ESP online if seen within the last 15 seconds (ESP reports every 3s)
+  return Date.now() - new Date(lastEspSeen).getTime() < 15000;
+}
+
+function updateEspHeartbeat() {
+  lastEspSeen = new Date();
+  return lastEspSeen;
+}
+
 function getLoads() {
   return {
     ...loads,
-    source: loads.supply
+    source: loads.supply,
+    espOnline: isEspOnline(),
+    lastEspSeen
   };
 }
 
 function hasLoadId(id) {
-  if (id === 'source' || id === '3' || id === 3) return true;
+  if (id === 'source' || id === '3' || id === 3 || id === 'supply') return true;
+  if (id === '1' || id === 1 || id === 'load1') return true;
+  if (id === '2' || id === 2 || id === 'load2') return true;
   return Object.prototype.hasOwnProperty.call(loads, id);
 }
 
-function toggleLoad(id) {
-  let target = id;
-  if (id === 'source' || id === '3' || id === 3) target = 'supply';
-  if (id === '1' || id === 1) target = 'load1';
-  if (id === '2' || id === 2) target = 'load2';
+function normalizeLoadId(id) {
+  if (id === 'source' || id === '3' || id === 3 || id === 'supply') return 'supply';
+  if (id === '1' || id === 1 || id === 'load1') return 'load1';
+  if (id === '2' || id === 2 || id === 'load2') return 'load2';
+  return id;
+}
 
+function toggleLoad(id) {
+  const target = normalizeLoadId(id);
   if (Object.prototype.hasOwnProperty.call(loads, target)) {
     loads[target] = !loads[target];
     return loads[target];
   }
   return false;
+}
+
+function setLoad(id, explicitState) {
+  const target = normalizeLoadId(id);
+  if (Object.prototype.hasOwnProperty.call(loads, target)) {
+    if (typeof explicitState === "boolean") {
+      loads[target] = explicitState;
+    } else {
+      loads[target] = !loads[target];
+    }
+    return loads[target];
+  }
+  return false;
+}
+
+function setAllLoads(newLoads) {
+  if (typeof newLoads.load1 === "boolean") loads.load1 = newLoads.load1;
+  if (typeof newLoads.load2 === "boolean") loads.load2 = newLoads.load2;
+  if (typeof newLoads.supply === "boolean") loads.supply = newLoads.supply;
+  if (typeof newLoads.source === "boolean") loads.supply = newLoads.source;
+  return getLoads();
 }
 
 function setLatestSensorData(data) {
@@ -74,7 +115,12 @@ module.exports = {
   getSwitchState,
   getLoads,
   hasLoadId,
+  normalizeLoadId,
   toggleLoad,
+  setLoad,
+  setAllLoads,
+  isEspOnline,
+  updateEspHeartbeat,
   setLatestSensorData,
   getLatestSensorData,
   getSettingsFallback,
