@@ -34,6 +34,8 @@ async function getLatestSensor(req, res, next) {
       battery: toNumberOrDefault(data.battery, DEFAULT_SENSOR_DATA.battery),
       inputVoltage: toNumberOrDefault(data.inputVoltage, DEFAULT_SENSOR_DATA.inputVoltage),
       current: toNumberOrDefault(data.current, DEFAULT_SENSOR_DATA.current),
+      current1: toNumberOrDefault(data.current1, 0),
+      current2: toNumberOrDefault(data.current2, 0),
       createdAt: data.createdAt || null
     });
   } catch (err) {

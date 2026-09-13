@@ -16,6 +16,8 @@ const sendData = async (req, res) => {
       battery,
       inputVoltage,
       current,
+      current1,
+      current2,
       load1,
       load2,
       source,
@@ -30,8 +32,10 @@ const sendData = async (req, res) => {
       temperature: `${temperature}°C`,
       humidity: `${humidity}%`,
       battery: `${battery}%`,
-      inputVoltage: `${inputVoltage}V AC`,
-      current: `${current}A`,
+      inputVoltage: `${inputVoltage}V AC (ZMPT101B)`,
+      current: `${current}A (Total JCT5052C)`,
+      current1: `${current1}A (JCT5052C Sensor 1)`,
+      current2: `${current2}A (JCT5052C Sensor 2)`,
       hardwareStates: {
         source: source || (supply ? "MAINS" : "INVERTER"),
         load1: load1,
@@ -49,7 +53,9 @@ const sendData = async (req, res) => {
       distance,
       battery,
       inputVoltage,
-      current
+      current,
+      current1,
+      current2
     });
     let savedData = normalized;
 

@@ -85,13 +85,19 @@ function setAllLoads(newLoads) {
 }
 
 function setLatestSensorData(data) {
+  const c1 = data.current1 !== undefined ? Number(data.current1) : (latestSensorData.current1 || 0);
+  const c2 = data.current2 !== undefined ? Number(data.current2) : (latestSensorData.current2 || 0);
+  const totalC = data.current !== undefined ? Number(data.current) : (c1 + c2);
+
   latestSensorData = {
     temperature: Number(data.temperature),
     humidity: Number(data.humidity),
     distance: Number(data.distance),
     battery: data.battery === undefined ? latestSensorData.battery : Number(data.battery),
     inputVoltage: data.inputVoltage === undefined ? latestSensorData.inputVoltage : Number(data.inputVoltage),
-    current: data.current === undefined ? (latestSensorData.current || 0) : Number(data.current)
+    current: totalC,
+    current1: c1,
+    current2: c2
   };
 
   return latestSensorData;
