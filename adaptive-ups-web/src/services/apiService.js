@@ -14,7 +14,7 @@ class ApiService {
 
   async _request(path, options = {}) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
     try {
       const response = await fetch(`${this.baseUrl}${path}`, {
         ...options,

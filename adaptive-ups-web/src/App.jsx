@@ -344,15 +344,25 @@ export default function App() {
     }
   };
 
-  // Batch set loads
+  // Batch set loads (All 5 Relays)
   const handleBatchSetLoads = async (state) => {
     setLoad1On(state);
     setLoad2On(state);
+    setSupplyOn(state);
+    setBattSupplyOn(state);
+    setChargerOn(state);
     setManualL1(state);
     setManualL2(state);
+    setManualSupply(state);
     try {
-      await primaryApi.batchSetLoads({ load1: state, load2: state });
-      addLog(`All loads set to ${state ? 'CONNECTED' : 'ISOLATED'}`, 'ok');
+      await primaryApi.batchSetLoads({
+        load1: state,
+        load2: state,
+        supply: state,
+        battSupply: state,
+        charger: state,
+      });
+      addLog(`All 5 relays set to ${state ? 'CONNECTED' : 'ISOLATED'}`, 'ok');
     } catch {
       addLog('Batch command failed: Network error', 'crit');
     }
