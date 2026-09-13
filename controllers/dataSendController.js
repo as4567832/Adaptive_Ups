@@ -73,12 +73,26 @@ const sendData = async (req, res) => {
       }
     }
 
-    const currentLoads = getLoads();
+    // Sync backend memory state with reported hardware states from ESP32 Serial/Web commands
+    const hwStates = {};
+    if (typeof load1 === "boolean") hwStates.load1 = load1;
+    if (typeof load2 === "boolean") hwStates.load2 = load2;
+    const suppVal = typeof supply === "boolean" ? supply : (source === "MAINS" || source === true ? true : (source === "INVERTER" || source === false ? false : undefined));
+    if (typeof suppVal === "boolean") {
+      hwStates.supply = suppVal;
+      hwStates.source = suppVal;
+    }
+    if (typeof req.body.battSupply === "boolean") hwStates.battSupply = req.body.battSupply;
+    if (typeof req.body.charger === "boolean") hwStates.charger = req.body.charger;
+
+    const currentLoads = setAllLoads(hwStates);
     const responseLoads = {
       load1: currentLoads.load1,
       load2: currentLoads.load2,
       supply: currentLoads.supply,
-      source: currentLoads.supply
+      source: currentLoads.supply,
+      battSupply: currentLoads.battSupply,
+      charger: currentLoads.charger
     };
 
     return res.status(200).json({
