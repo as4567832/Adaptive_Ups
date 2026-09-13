@@ -19,7 +19,9 @@ async function getAllLoads(req, res) {
         setAllLoads({
           load1: doc.load1,
           load2: doc.load2,
-          supply: doc.supply ?? doc.source
+          supply: doc.supply ?? doc.source,
+          battSupply: doc.battSupply,
+          charger: doc.charger
         });
       }
     } catch (err) {

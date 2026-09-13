@@ -59,21 +59,7 @@ const sendData = async (req, res) => {
     });
     let savedData = normalized;
 
-    if (isDbConnected()) {
-      try {
-        const newData = new Sensor(normalized);
-        savedData = await newData.save();
-        await Relay.findOneAndUpdate(
-          {},
-          { lastEspSeen: new Date() },
-          { upsert: true }
-        );
-      } catch (dbErr) {
-        console.error("MongoDB Save Error (Data kept in memory fallback):", dbErr.message);
-      }
-    }
-
-    // Sync backend memory state with reported hardware states from ESP32 Serial/Web commands
+    // Sync backend memory & MongoDB state with reported hardware states from ESP32 Serial/Web commands
     const hwStates = {};
     if (typeof load1 === "boolean") hwStates.load1 = load1;
     if (typeof load2 === "boolean") hwStates.load2 = load2;
@@ -84,6 +70,20 @@ const sendData = async (req, res) => {
     }
     if (typeof req.body.battSupply === "boolean") hwStates.battSupply = req.body.battSupply;
     if (typeof req.body.charger === "boolean") hwStates.charger = req.body.charger;
+
+    if (isDbConnected()) {
+      try {
+        const newData = new Sensor(normalized);
+        savedData = await newData.save();
+        await Relay.findOneAndUpdate(
+          {},
+          { ...hwStates, lastEspSeen: new Date() },
+          { upsert: true }
+        );
+      } catch (dbErr) {
+        console.error("MongoDB Save Error (Data kept in memory fallback):", dbErr.message);
+      }
+    }
 
     const currentLoads = setAllLoads(hwStates);
     const responseLoads = {
