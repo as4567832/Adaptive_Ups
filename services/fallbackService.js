@@ -103,9 +103,18 @@ function setAllLoads(newLoads) {
 }
 
 function setLatestSensorData(data) {
-  const c1 = data.current1 !== undefined ? Number(data.current1) : (latestSensorData.current1 || 0);
-  const c2 = data.current2 !== undefined ? Number(data.current2) : (latestSensorData.current2 || 0);
-  const totalC = data.current !== undefined ? Number(data.current) : (c1 + c2);
+  const currentLoads = getLoads();
+
+  let c1 = data.current1 !== undefined ? Number(data.current1) : (latestSensorData.current1 || 0);
+  let c2 = data.current2 !== undefined ? Number(data.current2) : (latestSensorData.current2 || 0);
+
+  if (!currentLoads.load1) c1 = 0;
+  if (!currentLoads.load2) c2 = 0;
+
+  let totalC = 0;
+  if (currentLoads.load1 || currentLoads.load2) {
+    totalC = data.current !== undefined ? Number(data.current) : (c1 + c2);
+  }
 
   latestSensorData = {
     temperature: Number(data.temperature),
