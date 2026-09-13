@@ -84,7 +84,7 @@ async function toggleLoadById(req, res) {
 }
 
 async function batchSetLoads(req, res) {
-  const { load1, load2, supply, source } = req.body;
+  const { load1, load2, supply, source, battSupply, charger } = req.body;
   const targetSupply = typeof supply === "boolean" ? supply : source;
 
   const newStates = {};
@@ -94,6 +94,8 @@ async function batchSetLoads(req, res) {
     newStates.supply = targetSupply;
     newStates.source = targetSupply;
   }
+  if (typeof battSupply === "boolean") newStates.battSupply = battSupply;
+  if (typeof charger === "boolean") newStates.charger = charger;
 
   const updatedLoads = setAllLoads(newStates);
 

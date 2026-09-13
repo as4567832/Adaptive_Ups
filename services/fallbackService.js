@@ -4,7 +4,9 @@ let switchState = false;
 let loads = {
   load1: true,
   load2: true,
-  supply: true
+  supply: true,
+  battSupply: true,
+  charger: true
 };
 
 let lastEspSeen = null;
@@ -44,6 +46,8 @@ function hasLoadId(id) {
   if (id === 'source' || id === '3' || id === 3 || id === 'supply') return true;
   if (id === '1' || id === 1 || id === 'load1') return true;
   if (id === '2' || id === 2 || id === 'load2') return true;
+  if (id === '4' || id === 4 || id === 'battSupply' || id === 'battsupply' || id === 'battery') return true;
+  if (id === '5' || id === 5 || id === 'charger' || id === 'charge') return true;
   return Object.prototype.hasOwnProperty.call(loads, id);
 }
 
@@ -51,6 +55,8 @@ function normalizeLoadId(id) {
   if (id === 'source' || id === '3' || id === 3 || id === 'supply') return 'supply';
   if (id === '1' || id === 1 || id === 'load1') return 'load1';
   if (id === '2' || id === 2 || id === 'load2') return 'load2';
+  if (id === '4' || id === 4 || id === 'battSupply' || id === 'battsupply' || id === 'battery') return 'battSupply';
+  if (id === '5' || id === 5 || id === 'charger' || id === 'charge') return 'charger';
   return id;
 }
 
@@ -81,6 +87,8 @@ function setAllLoads(newLoads) {
   if (typeof newLoads.load2 === "boolean") loads.load2 = newLoads.load2;
   if (typeof newLoads.supply === "boolean") loads.supply = newLoads.supply;
   if (typeof newLoads.source === "boolean") loads.supply = newLoads.source;
+  if (typeof newLoads.battSupply === "boolean") loads.battSupply = newLoads.battSupply;
+  if (typeof newLoads.charger === "boolean") loads.charger = newLoads.charger;
   return getLoads();
 }
 
