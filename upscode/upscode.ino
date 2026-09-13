@@ -842,13 +842,7 @@ void loop() {
       float acInputVoltage = readACVoltageZMPT101B();
 
       // Read AC/DC Current from ACS712 (GPIO 32)
-      float rawCurrent = readACCurrentACS712();
-      if (!l1State && !l2State) {
-        rawCurrent = 0.0;
-      }
-      float loadCurrent = (!l1State && !l2State) ? 0.0 : rawCurrent;
-      float c1 = l1State ? (l2State ? loadCurrent * 0.55 : loadCurrent) : 0.0;
-      float c2 = l2State ? (l1State ? loadCurrent * 0.45 : loadCurrent) : 0.0;
+      float loadCurrent = readACCurrentACS712();
 
       float temperature = sensors.getTempCByIndex(0);
       float humidity = random(400, 800) / 10.0;
@@ -863,8 +857,8 @@ void loop() {
       doc["battery"] = battery;
       doc["inputVoltage"] = inputVoltage;
       doc["current"] = loadCurrent;
-      doc["current1"] = c1;
-      doc["current2"] = c2;
+      doc["current1"] = loadCurrent * 0.55;
+      doc["current2"] = loadCurrent * 0.45;
       doc["source"] = sourceState ? "MAINS" : "INVERTER";
       doc["supply"] = sourceState;
       doc["load1"] = l1State;
