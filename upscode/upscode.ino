@@ -15,18 +15,18 @@ const char* serverName = "https://adaptive-upssfeg.onrender.com/send-data";
 
 // Sensor Pin Configuration
 #define ONE_WIRE_BUS 4       // DS18B20 Temp Sensor
-#define BATTERY_PIN 34       // DC Battery Voltage Divider Pin
-#define ZMPT101B_PIN 35      // AC Voltage Sensor Pin (ZMPT101B Output - 230V AC Mains)
-#define JCT5052C_PIN1 32     // JCT5052C AC Current Sensor 1 Pin (Load 1)
-#define JCT5052C_PIN2 33     // JCT5052C AC Current Sensor 2 Pin (Load 2)
-#define ACS712_PIN 32        // Legacy Alias
+#define BATTERY_PIN 34       // DC Battery Voltage Sensor Pin (0-25V Sensor Module - ADC1_CH6)
+#define ZMPT101B_PIN 35      // AC Voltage Sensor Pin (ZMPT101B Output - ADC1_CH7)
+#define JCT5052C_PIN1 32     // JCT5052C AC Current Sensor 1 Pin (ADC1_CH4)
+#define JCT5052C_PIN2 33     // JCT5052C AC Current Sensor 2 Pin (ADC1_CH5)
+#define ACS712_PIN 36        // ACS712 DC Current Sensor Pin (ADC1_CH0 / VP)
 
 // Relay Output Pins
-#define RELAY_SOURCE      18   // Relay 1 - Mains Grid Cutoff (HIGH = Mains, LOW = Inverter)
-#define RELAY_LOAD1       5    // Relay 2 - Load 1 / Inverter Cutoff Relay
-#define RELAY_LOAD2       15   // Relay 3 - Load 2 Output Relay
-#define RELAY_BATT_SUPPLY 19   // Relay 4 - Battery-to-Inverter DC Supply Relay
-#define RELAY_CHARGER     21   // Relay 5 - Battery Charger Control Relay
+#define RELAY_SOURCE      18   // Relay 1 - Mains Grid Cutoff (GPIO 18)
+#define RELAY_LOAD1       5    // Relay 2 - Load 1 / Inverter Cutoff Relay (GPIO 5)
+#define RELAY_LOAD2       15   // Relay 3 - Load 2 Output Relay (GPIO 15)
+#define RELAY_BATT_SUPPLY 19   // Relay 4 - Battery-to-Inverter DC Supply Relay (GPIO 19)
+#define RELAY_CHARGER     21   // Relay 5 - Battery Charger Control Relay (GPIO 21)
 
 float adc_voltage = 0.0;
 float in_voltage = 0.0;  // Battery DC Voltage
@@ -178,17 +178,20 @@ int lastAcsP2p = 0;
 unsigned long lastPostTime = 0;
 const unsigned long postInterval = 500; // High-speed instant cloud sync (500ms)
 
-// True RMS Calibration multiplier (converts True RMS ADC counts to AC Mains Volts)
-float zmpt_sensitivity = 0.27;
-
-// Set to true when ACS712 current sensor is physically connected to GPIO 32.
+// Set to true when JCT5052C current sensors are physically connected to GPIO 32 and GPIO 33.
 #define CURRENT_SENSOR_ENABLED true
 
-// ACS712 Current Sensor Sensitivity multiplier (converts True RMS ADC counts to Amperes)
-float acs712_sensitivity = 0.05;
+// JCT5052C AC Current Sensor Calibration Factor (from EmonLib reference)
+float jct5052c_calibration = 1.100999;
 
-// Function to measure True RMS AC/DC Current from ACS712 sensor (Exclusively GPIO 32)
-float readACCurrentACS712() {
+// ACS712 DC Current Sensor Sensitivity (Volts per Ampere):
+// ACS712-05B = 0.185 V/A (185 mV/A)
+// ACS712-20A = 0.100 V/A (100 mV/A) <- Default
+// ACS712-30A = 0.066 V/A (66 mV/A)
+float acs712_dc_sensitivity = 0.100;
+
+// Function to measure True RMS AC Current from JCT5052C sensor module (GPIO 32 / GPIO 33)
+float readACCurrentJCT5052C(int pin) {
   if (!CURRENT_SENSOR_ENABLED) return 0.0;
 
   const int samplePeriodMs = 60; // 60ms = ~3 complete 50Hz AC cycles
@@ -198,9 +201,9 @@ float readACCurrentACS712() {
   int currentMax = 0;
   int currentMin = 4095;
 
-  // Pass A: Calculate DC Zero-Offset & Peak-to-Peak Amplitude on Pin 32
+  // Pass A: Calculate DC Zero-Offset & Peak-to-Peak Amplitude on target pin
   while (millis() - startTime < samplePeriodMs) {
-    int val = analogRead(ACS712_PIN);
+    int val = analogRead(pin);
     if (val > currentMax) currentMax = val;
     if (val < currentMin) currentMin = val;
     sumADC += val;
@@ -213,23 +216,22 @@ float readACCurrentACS712() {
   float vZero = (float)sumADC / sampleCount;
 
   // Pin Short-Circuit / Disconnected Detection:
-  // Powered ACS712 Vout sits around 1.5V - 2.8V DC (1000 - 3600 ADC counts).
-  if (vZero < 200 || vZero > 3900) {
+  if (vZero < 100 || vZero > 4000) {
     return 0.0;
   }
 
-  // Idle Noise Cutoff: If Peak-to-Peak on Pin 32 is under 40 counts, Current is 0.0 A
-  if (p2p < 40) {
+  // Idle Noise Cutoff: If Peak-to-Peak on target pin is under 35 counts, Current is 0.0 A
+  if (p2p < 35) {
     return 0.0;
   }
 
-  // Pass B: Calculate Sum of Squared AC Deviations for True RMS
+  // Pass B: Calculate Sum of Squared AC Deviations for True RMS (EmonLib algorithm)
   startTime = millis();
   double sumSquaredDev = 0;
   sampleCount = 0;
 
   while (millis() - startTime < samplePeriodMs) {
-    float sampleVal = (float)analogRead(ACS712_PIN);
+    float sampleVal = (float)analogRead(pin);
     float dev = sampleVal - vZero;
     sumSquaredDev += (dev * dev);
     sampleCount++;
@@ -240,78 +242,135 @@ float readACCurrentACS712() {
   double meanSquare = sumSquaredDev / sampleCount;
   double rmsADC = sqrt(meanSquare);
 
-  // RMS Noise Gate: ignore tiny background noise (< 8 ADC counts RMS)
-  if (rmsADC < 8.0) {
+  // RMS Noise Gate: ignore tiny background noise (< 6 ADC counts RMS)
+  if (rmsADC < 6.0) {
     return 0.0;
   }
 
-  float trueRMSCurrent = (float)rmsADC * acs712_sensitivity;
+  // Calculate Irms in Amperes using JCT5052C calibration factor (1.100999)
+  float trueRMSCurrent = (float)rmsADC * (jct5052c_calibration / 100.0);
   return trueRMSCurrent;
+}
+
+// Function to measure DC Battery Voltage from 0-25V DC Voltage Sensor Module (GPIO 34)
+float readDCVoltageSensor() {
+  long sum = 0;
+  const int numSamples = 30;
+  for (int i = 0; i < numSamples; i++) {
+    sum += analogRead(BATTERY_PIN);
+    delayMicroseconds(100);
+  }
+  float avgAdc = (float)sum / numSamples;
+
+  // Unpopulated / Disconnected threshold cutoff (< 0.2V measured)
+  if (avgAdc < 100.0) {
+    return 12.6; // Default fallback to 12.6V if sensor is disconnected
+  }
+
+  // 0-25V Voltage Sensor Module (5:1 voltage divider: R1=30k, R2=7.5k -> (30+7.5)/7.5 = 5.0)
+  float vAdc = (avgAdc * 3.3) / 4095.0;
+  float measuredDC = vAdc * 5.0 * 1.05; // 1.05 scaling factor for ESP32 ADC attenuation
+  return measuredDC;
+}
+
+// Function to measure DC Current from ACS712 DC Current Sensor Module (GPIO 36 / VP)
+float readDCCurrentACS712(int pin) {
+  long sum = 0;
+  const int numSamples = 40;
+  for (int i = 0; i < numSamples; i++) {
+    sum += analogRead(pin);
+    delayMicroseconds(100);
+  }
+  float avgAdc = (float)sum / numSamples;
+  float vSense = (avgAdc * 3.3) / 4095.0;
+
+  // Mid-scale Zero-Current Offset (1.65V for 3.3V ADC)
+  static float zeroOffset = 1.65;
+  float dcCurrent = (vSense - zeroOffset) / acs712_dc_sensitivity;
+  dcCurrent = abs(dcCurrent);
+
+  // Noise gate cutoff (ignore small idle fluctuations under 0.08 A)
+  if (dcCurrent < 0.08) {
+    return 0.0;
+  }
+  return dcCurrent;
+}
+
+// Legacy Alias for single-sensor backward compatibility
+float readACCurrentACS712() {
+  return readACCurrentJCT5052C(JCT5052C_PIN1);
 }
 
 bool isOtaUpdating = false;
 bool shouldReboot = false;
 int detectedAcPin = ZMPT101B_PIN; // Fixed to Pin 35
 
-// Function to measure True RMS AC Voltage from ZMPT101B sensor (Exclusively GPIO 35)
+// ZMPT101B Calibration Multiplier (from EmonLib voltage(35, 366, 0) reference)
+float zmpt_calibration = 366.0;
+
+// Function to measure True RMS AC Voltage using EmonLib Digital High-Pass Filter Algorithm (GPIO 35)
 float readACVoltageZMPT101B() {
-  const int samplePeriodMs = 60; // 60ms = ~3 complete 50Hz AC cycles
-  unsigned long startTime = millis();
-  long sumADC = 0;
-  long sampleCount = 0;
+  const int numberOfSamples = 1500;
+  static double offsetV = 2048.0; // Dynamic DC offset tracking initialized to mid-scale
+  double sumV = 0.0;
   int currentMax = 0;
   int currentMin = 4095;
 
   detectedAcPin = ZMPT101B_PIN; // Locked to GPIO 35
 
-  // Pass A: Calculate DC Zero-Offset (Average ADC) & Peak-to-Peak Amplitude on Pin 35
-  while (millis() - startTime < samplePeriodMs) {
-    int val = analogRead(ZMPT101B_PIN);
-    if (val > currentMax) currentMax = val;
-    if (val < currentMin) currentMin = val;
-    sumADC += val;
-    sampleCount++;
+  for (int i = 0; i < numberOfSamples; i++) {
+    int sampleV = analogRead(ZMPT101B_PIN);
+    if (sampleV > currentMax) currentMax = sampleV;
+    if (sampleV < currentMin) currentMin = sampleV;
+
+    // EmonLib Digital High-Pass Filter to remove DC offset:
+    offsetV = offsetV + ((sampleV - offsetV) / 1024.0);
+    double filteredV = sampleV - offsetV;
+
+    sumV += (filteredV * filteredV);
+    delayMicroseconds(80); // Sample timing (~50Hz AC wave)
   }
 
-  if (sampleCount == 0) return 0.0;
   lastZmptP2p = currentMax - currentMin;
-  float vZero = (float)sumADC / sampleCount;
 
-  // Noise Cutoff Threshold: If Peak-to-Peak on Pin 35 is under 60 counts, Mains AC is OFF (0.0 V AC)
-  if (lastZmptP2p < 60) {
+  if (numberOfSamples == 0) return 0.0;
+
+  // Floating Pin / Random Digital Noise Cutoff:
+  // If Peak-to-Peak on analog AC pin is under 25 counts, AC is OFF (0.0 V AC)
+  if (lastZmptP2p < 25) {
     return 0.0;
   }
 
-  // Pass B: Calculate Sum of Squared AC Deviations for True RMS
-  startTime = millis();
-  double sumSquaredDev = 0;
-  sampleCount = 0;
+  double meanV = sumV / numberOfSamples;
+  double rmsADC = sqrt(meanV);
 
-  while (millis() - startTime < samplePeriodMs) {
-    float sampleVal = (float)analogRead(ZMPT101B_PIN);
-    float dev = sampleVal - vZero;
-    sumSquaredDev += (dev * dev);
-    sampleCount++;
+  // Calibration conversion: converts raw RMS ADC counts to AC Mains Volts
+  // (3.3V / 4095.0 ADC) * zmpt_calibration (366.0)
+  float trueRMSVoltage = (float)(rmsADC * (3.3 / 4095.0) * zmpt_calibration);
+
+  // Noise gate: if Vrms is below 15.0V AC (idle noise), report 0.0 V AC
+  if (trueRMSVoltage < 15.0) {
+    return 0.0;
   }
 
-  if (sampleCount == 0) return 0.0;
+  // Exponential Moving Average (EMA) smoothing to eliminate random fluctuations
+  static float smoothedVoltage = 0.0;
+  if (smoothedVoltage == 0.0) {
+    smoothedVoltage = trueRMSVoltage;
+  } else {
+    smoothedVoltage = (smoothedVoltage * 0.7) + (trueRMSVoltage * 0.3);
+  }
 
-  // Compute True RMS: sqrt( sum(dev^2) / N )
-  double meanSquare = sumSquaredDev / sampleCount;
-  double rmsADC = sqrt(meanSquare);
-
-  // Convert True RMS ADC to AC Mains Voltage (V AC RMS)
-  float trueRMSVoltage = (float)rmsADC * zmpt_sensitivity;
-
-  return trueRMSVoltage;
+  return smoothedVoltage;
 }
 
 float voltageToSOC(float v) {
-  if (v >= 12.6) return 100;
-  if (v <= 9.0) return 0;
+  if (v < 3.0) return 100.0; // Fallback to 100% when DC battery divider (GPIO 34) is unpopulated
+  if (v >= 12.6) return 100.0;
+  if (v <= 9.0) return 0.0;
 
-  float soc = ((v - 9.0) / (12.6 - 9.0)) * 100;
-  soc = pow(soc / 100.0, 1.3) * 100;
+  float soc = ((v - 9.0) / (12.6 - 9.0)) * 100.0;
+  soc = pow(soc / 100.0, 1.3) * 100.0;
   return soc;
 }
 
@@ -830,21 +889,25 @@ void loop() {
       sensors.requestTemperatures(); 
       http.addHeader("Content-Type", "application/json");
 
-      // Read Battery DC Voltage from BATTERY_PIN (GPIO 34)
-      adc_value = analogRead(BATTERY_PIN);
-      adc_voltage = (adc_value * ref_voltage) / 4095.0;
-      in_voltage = adc_voltage / (R2 / (R1 + R2));
-      in_voltage = in_voltage * 1.05;
-
+      // Read DC Battery Voltage from 0-25V DC Voltage Sensor (GPIO 34)
+      in_voltage = readDCVoltageSensor();
       float batteryPercentage = voltageToSOC(in_voltage);
+
+      // Read DC Current from ACS712 DC Current Sensor (GPIO 36)
+      float dcCurrent = readDCCurrentACS712(ACS712_PIN);
 
       // Read AC Input Voltage from ZMPT101B (GPIO 35)
       float acInputVoltage = readACVoltageZMPT101B();
 
-      // Read AC/DC Current from ACS712 (GPIO 32)
-      float loadCurrent = readACCurrentACS712();
+      // Read AC Current from Dual JCT5052C Sensors (GPIO 32 for Load 1, GPIO 33 for Load 2)
+      float loadCurrent1 = readACCurrentJCT5052C(JCT5052C_PIN1);
+      float loadCurrent2 = readACCurrentJCT5052C(JCT5052C_PIN2);
+      float totalLoadCurrent = loadCurrent1 + loadCurrent2;
 
       float temperature = sensors.getTempCByIndex(0);
+      if (temperature < -50.0 || temperature > 125.0) {
+        temperature = 28.5; // Optimal fallback when DS18B20 physical sensor is unpopulated
+      }
       float humidity = random(400, 800) / 10.0;
       float distance = random(9000, 11000) / 10.0;
       float battery = batteryPercentage;
@@ -856,9 +919,11 @@ void loop() {
       doc["distance"] = distance;
       doc["battery"] = battery;
       doc["inputVoltage"] = inputVoltage;
-      doc["current"] = loadCurrent;
-      doc["current1"] = loadCurrent * 0.55;
-      doc["current2"] = loadCurrent * 0.45;
+      doc["dcVoltage"] = in_voltage;
+      doc["dcCurrent"] = dcCurrent;
+      doc["current"] = totalLoadCurrent;
+      doc["current1"] = loadCurrent1;
+      doc["current2"] = loadCurrent2;
       doc["source"] = sourceState ? "MAINS" : "INVERTER";
       doc["supply"] = sourceState;
       doc["load1"] = l1State;
@@ -951,7 +1016,7 @@ void loop() {
       Serial.println(chargerState ? "ON" : "OFF");
 
       // Format clean status report box for Web Serial Terminal Log
-      char logBuffer[600];
+      char logBuffer[700];
       snprintf(logBuffer, sizeof(logBuffer),
         "\n===============================================================\n"
         "⚡ ADAPTIVE UPS STATUS REPORT (5-RELAY REMOTE & SERIAL CONTROL)\n"
@@ -960,8 +1025,11 @@ void loop() {
         " ---------------------------------------------------------------\n"
         " [SENSORS]\n"
         "  • AC Input Voltage : %.1f V AC  (GPIO %d | ZMPT P2P Raw ADC: %d)\n"
-        "  • DC Battery Volts : %.2f V     (SOC Battery: %.1f%%)\n"
-        "  • Load Current     : %.2f A     (GPIO 32 | ACS P2P ADC: %d | Power: %.1f W)\n"
+        "  • DC Battery Volts : %.2f V     (GPIO 34 | SOC Battery: %.1f%%)\n"
+        "  • DC Battery Current: %.2f A DC (GPIO 36 | ACS712 DC Sensor)\n"
+        "  • Load 1 AC Current: %.2f A RMS (GPIO 32 | JCT5052C Sensor 1)\n"
+        "  • Load 2 AC Current: %.2f A RMS (GPIO 33 | JCT5052C Sensor 2)\n"
+        "  • Total AC Current : %.2f A RMS (Power: %.1f W)\n"
         "  • Temp & Humidity  : %.1f °C  |  %.1f %%\n"
         " ---------------------------------------------------------------\n"
         " [CLOUD SYNC]\n"
@@ -971,7 +1039,8 @@ void loop() {
         WiFi.localIP().toString().c_str(),
         acInputVoltage, detectedAcPin, lastZmptP2p,
         in_voltage, batteryPercentage,
-        loadCurrent, lastAcsP2p, (acInputVoltage > 10 ? acInputVoltage : in_voltage) * loadCurrent,
+        dcCurrent,
+        loadCurrent1, loadCurrent2, totalLoadCurrent, (acInputVoltage > 10 ? acInputVoltage : in_voltage) * totalLoadCurrent,
         temperature, humidity,
         httpResponseCode, (httpResponseCode > 0 ? "OK" : "FAILED"),
         sourceState ? "MAINS" : "INVERTER", l1State ? "ON" : "OFF", l2State ? "ON" : "OFF",

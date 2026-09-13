@@ -4,6 +4,8 @@ const DEFAULT_SENSOR_DATA = {
   distance: 100,
   battery: 100,
   inputVoltage: 220,
+  dcVoltage: 12.6,
+  dcCurrent: 0,
   current: 0
 };
 const DEFAULT_SETTINGS = {

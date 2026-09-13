@@ -106,6 +106,7 @@ function setLatestSensorData(data) {
   const c1 = data.current1 !== undefined ? Number(data.current1) : (latestSensorData.current1 || 0);
   const c2 = data.current2 !== undefined ? Number(data.current2) : (latestSensorData.current2 || 0);
   const totalC = data.current !== undefined ? Number(data.current) : (c1 + c2);
+  const defaultDcV = data.battery !== undefined ? (9.0 + (Number(data.battery) / 100.0) * 3.6) : 12.6;
 
   latestSensorData = {
     temperature: Number(data.temperature),
@@ -113,6 +114,8 @@ function setLatestSensorData(data) {
     distance: Number(data.distance),
     battery: data.battery === undefined ? latestSensorData.battery : Number(data.battery),
     inputVoltage: data.inputVoltage === undefined ? latestSensorData.inputVoltage : Number(data.inputVoltage),
+    dcVoltage: data.dcVoltage !== undefined ? Number(data.dcVoltage) : (latestSensorData.dcVoltage || defaultDcV),
+    dcCurrent: data.dcCurrent !== undefined ? Number(data.dcCurrent) : (latestSensorData.dcCurrent || 0),
     current: totalC,
     current1: c1,
     current2: c2

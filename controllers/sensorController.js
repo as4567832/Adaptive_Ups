@@ -33,6 +33,8 @@ async function getLatestSensor(req, res, next) {
       distance: toNumberOrDefault(data.distance, DEFAULT_SENSOR_DATA.distance),
       battery: toNumberOrDefault(data.battery, DEFAULT_SENSOR_DATA.battery),
       inputVoltage: toNumberOrDefault(data.inputVoltage, DEFAULT_SENSOR_DATA.inputVoltage),
+      dcVoltage: toNumberOrDefault(data.dcVoltage, DEFAULT_SENSOR_DATA.dcVoltage || 12.6),
+      dcCurrent: toNumberOrDefault(data.dcCurrent, DEFAULT_SENSOR_DATA.dcCurrent || 0),
       current: toNumberOrDefault(data.current, DEFAULT_SENSOR_DATA.current),
       current1: toNumberOrDefault(data.current1, 0),
       current2: toNumberOrDefault(data.current2, 0),
@@ -45,13 +47,13 @@ async function getLatestSensor(req, res, next) {
 
 async function createSensorData(req, res, next) {
   try {
-    const { temperature, humidity, distance, battery, inputVoltage, current } = req.body;
+    const { temperature, humidity, distance, battery, inputVoltage, dcVoltage, dcCurrent, current } = req.body;
 
     if (temperature === undefined || humidity === undefined || distance === undefined) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    const normalized = setLatestSensorData({ temperature, humidity, distance, battery, inputVoltage, current });
+    const normalized = setLatestSensorData({ temperature, humidity, distance, battery, inputVoltage, dcVoltage, dcCurrent, current });
 
     if (!isDbConnected()) {
       return res.status(200).json({
